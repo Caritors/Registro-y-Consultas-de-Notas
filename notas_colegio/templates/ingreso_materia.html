@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingreso de Materia</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- Icono -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+
+    <div class="container mt-5">
+        <h1 class="text-center">Ingreso de Materia</h1>
+
+        <!-- Formulario de ingreso de materia -->
+        <form action="{{ url_for('ingreso_materia') }}" method="POST">
+            
+            <!-- Mensajes Flash -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-info">
+                    {% for category, message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- Campo de Nombre de Materia -->
+            <div class="mb-3">
+                <label for="materia" class="form-label">Materia</label>
+                <input type="text" class="form-control" id="materia" name="materia" required>
+            </div>
+
+            <!-- Campo de Intensidad Horaria -->
+            <div class="mb-3">
+                <label for="intensidad_horaria" class="form-label">Intensidad Horaria</label>
+                <input type="text" class="form-control" id="intensidad_horaria" name="intensidad_horaria" required>
+            </div>
+
+            <!-- Campo de Descripción -->
+            <div class="mb-3">
+                <label for="descripcion" class="form-label">Descripción</label>
+                <textarea class="form-control" id="descripcion" name="descripcion" rows="4" required></textarea>
+            </div>
+
+            <!-- Botón de envío del formulario -->
+            <button type="submit" class="btn btn-primary w-100">Ingresar Materia</button>
+        </form>
+
+        <!-- Enlace para volver -->
+        <div class="text-center mt-3">
+            <a href="{{ url_for('consulta') }}" class="btn btn-secondary">Volver a Consultas</a>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+
+
+
+
