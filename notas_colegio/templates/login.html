@@ -16,7 +16,7 @@
         <h1 class="text-center">Iniciar Sesión</h1>
 
         <!-- Formulario de inicio de sesión -->
-        <form action="{{ url_for('login_usuario') }}" method="POST">
+        <form action="{{ url_for('login') }}" method="POST">
             
             <!-- Mensajes Flash -->
             {% with messages = get_flashed_messages(with_categories=true) %}

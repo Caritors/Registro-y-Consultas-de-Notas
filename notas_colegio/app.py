@@ -68,7 +68,6 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # Lógica de la vista de login
     return render_template('login.html')
 
 
@@ -103,42 +102,44 @@ def ingreso_estudiante():
 @app.route('/ingreso_curso', methods=['GET', 'POST'])
 def ingreso_curso():
     if request.method == 'POST':
-        grado_id = request.form.get('grado')  # Obtener grado del formulario
+        grado_id = request.form.get('grado')  # Obtener el ID del grado
         curso_nombre = request.form.get('curso')  # Obtener nombre del curso
 
-        try:
-            # Validar que los datos sean correctos
-            if not grado_id or not curso_nombre:
-                flash('Error: Todos los campos son obligatorios.', 'danger')
-                return redirect(url_for('ingreso_curso'))
+        print(f"Grado recibido: {grado_id}, Curso: {curso_nombre}")  # Para depuración
 
-            # Convertir grado_id a entero
-            grado_id = int(grado_id)  
+        if not grado_id or not curso_nombre:
+            flash('Error: Todos los campos son obligatorios.', 'danger')
+            return redirect(url_for('ingreso_curso'))
 
-            # Verificar que el grado existe en la base de datos
-            grado_existente = Grado.query.get(grado_id)
-            if not grado_existente:
-                flash('Error: El grado seleccionado no existe.', 'danger')
-                return redirect(url_for('ingreso_curso'))
-
-            # Crear el nuevo curso
-            nuevo_curso = Curso(nombre=curso_nombre, grado_id=grado_id)
-            db.session.add(nuevo_curso)
-            db.session.commit()
-            flash('Curso ingresado exitosamente', 'success')
-
-        except ValueError:
+        if not grado_id.isdigit():  # Validar si es un número
             flash('Error: ID de grado inválido.', 'danger')
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Ocurrió un error al guardar el curso: {str(e)}', 'danger')
+            return redirect(url_for('ingreso_curso'))
 
-        return redirect(url_for('consulta'))  # Redirigir a la consulta
+        grado_id = int(grado_id)
 
-    # Si es una solicitud GET, cargar los grados disponibles
+        # Verificar que el grado existe en la base de datos
+        grado_existente = Grado.query.get(grado_id)
+        if not grado_existente:
+            flash('Error: El grado seleccionado no existe.', 'danger')
+            return redirect(url_for('ingreso_curso'))
+
+        # Verificar que el curso no exista ya en ese grado
+        curso_existente = Curso.query.filter_by(nombre=curso_nombre, grado_id=grado_id).first()
+        if curso_existente:
+            flash('Error: El curso ya existe en este grado.', 'danger')
+            return redirect(url_for('ingreso_curso'))
+
+        # Crear el nuevo curso
+        nuevo_curso = Curso(nombre=curso_nombre, grado_id=grado_id)
+        db.session.add(nuevo_curso)
+        db.session.commit()
+        flash('Curso ingresado exitosamente', 'success')
+
+        return redirect(url_for('consulta'))
+
+    # Cargar los grados disponibles
     grados = Grado.query.all()
     return render_template('ingreso_curso.html', grados=grados)
-
 
 @app.route('/ingreso_materia', methods=['GET', 'POST'])
 def ingreso_materia():
@@ -153,19 +154,53 @@ def ingreso_materia():
         return redirect(url_for('index'))
     return render_template('ingreso_materia.html')
 
+
+
+@app.route('/registro_usuario', methods=['GET', 'POST'])
+def registro_usuario():
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        apellido = request.form.get('apellido')
+        correo = request.form.get('correo')
+        contraseña = request.form.get('contraseña')
+
+        if not nombre or not apellido or not correo or not contraseña:
+            flash('Todos los campos son obligatorios', 'danger')
+            return redirect(url_for('registro_usuario'))
+        
+        flash('Usuario registrado exitosamente', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('registro_usuario.html')
+
+
+    
+
+
 @app.route('/ingreso_notas', methods=['GET', 'POST'])
 def ingreso_notas():
     if request.method == 'POST':
         estudiante_id = request.form.get('estudiante')
         curso_id = request.form.get('curso')
         nota = request.form.get('nota')
+        periodo = request.form.get('periodo')
 
-        if not estudiante_id or not curso_id or nota is None:
+        if not estudiante_id or not curso_id or nota is None or not periodo:
             flash("Todos los campos son obligatorios", "danger")
             return redirect(url_for('ingreso_notas'))
 
+        estudiante = Estudiante.query.get(estudiante_id)
+        if not estudiante:
+            flash("Error: Estudiante no encontrado.", "danger")
+            return redirect(url_for('ingreso_notas'))
+
+        curso = Curso.query.get(curso_id)
+        if not curso:
+            flash("Error: Curso no encontrado.", "danger")
+            return redirect(url_for('ingreso_notas'))
+
         # Guardar en la base de datos
-        nueva_nota = Nota(estudiante_id=estudiante_id, curso_id=curso_id, nota=nota)
+        nueva_nota = Nota(estudiante_id=estudiante_id, curso_id=curso_id, nota=nota, periodo=periodo)
         db.session.add(nueva_nota)
         db.session.commit()
 
@@ -173,10 +208,12 @@ def ingreso_notas():
         return redirect(url_for('ingreso_notas'))
 
     # Obtener los datos para los select
-    cursos = Curso.query.all()
     estudiantes = Estudiante.query.all()
+    cursos = Curso.query.all()  # <---- Agregado para cargar los cursos
 
-    return render_template('ingreso_notas.html', cursos=cursos, estudiantes=estudiantes)
+    return render_template('ingreso_notas.html', estudiantes=estudiantes, cursos=cursos)
+
+
 
 @app.route('/consulta')
 def consulta():
