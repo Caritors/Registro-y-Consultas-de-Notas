@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 
@@ -9,24 +9,20 @@ app.config['SECRET_KEY'] = 'tu_clave_secreta'
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Modelos
-
+# MODELOS
 class Grado(db.Model):
     __tablename__ = 'grado'
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
+    nombre = db.Column(db.String(100), nullable=False, unique=True)
     cursos = db.relationship('Curso', backref='grado', lazy=True)
 
-    def __repr__(self):
-        return f"<Grado {self.nombre}>"
-
-    
 class Curso(db.Model):
     __tablename__ = 'curso'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
     grado_id = db.Column(db.Integer, db.ForeignKey('grado.id'), nullable=False)
     estudiantes = db.relationship('Estudiante', backref='curso', lazy=True)
+    notas = db.relationship('Nota', backref='curso', lazy=True)
 
 class Estudiante(db.Model):
     __tablename__ = 'estudiante'
@@ -52,19 +48,13 @@ class Nota(db.Model):
     periodo = db.Column(db.String(100), nullable=False)
     estudiante_id = db.Column(db.Integer, db.ForeignKey('estudiante.id'), nullable=False)
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'), nullable=False)
-    curso = db.relationship('Curso', backref='notas')
-    
+
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     correo = db.Column(db.String(120), unique=True, nullable=False)
     contraseña = db.Column(db.String(120), nullable=False)
-    
 
-    def __repr__(self):
-        return f"<Usuario {self.correo}>"
-   
-
-# Rutas
+# RUTAS
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -74,18 +64,12 @@ def login():
     if request.method == 'POST':
         correo = request.form['correo']
         contraseña = request.form['contraseña']
-
-        # Aquí podrías agregar lógica real de autenticación
-        # Por ahora solo simulamos un login exitoso
-        if correo == 'admin@colegio.com' and contraseña == 'admin123':
+        usuario = Usuario.query.filter_by(correo=correo).first()
+        if usuario and usuario.contraseña == contraseña:
             flash('Inicio de sesión exitoso', 'success')
             return redirect(url_for('index'))
-        else:
-            flash('Correo o contraseña incorrectos', 'danger')
-            return redirect(url_for('login'))
-
+        flash('Correo o contraseña incorrectos', 'danger')
     return render_template('login.html')
-
 
 @app.route('/registro_grado', methods=['GET', 'POST'])
 def registro_grado():
@@ -101,18 +85,6 @@ def registro_grado():
             return redirect(url_for('index'))
     return render_template('registro_grado.html')
 
-@app.route('/registro_usuario', methods=['GET', 'POST'])
-def registro_usuario():
-    if request.method == 'POST':
-        correo = request.form['correo']
-        contraseña = request.form['contraseña']
-        nuevo_usuario = Usuario(correo=correo, contraseña=contraseña)
-        db.session.add(nuevo_usuario)
-        db.session.commit()
-        flash('Usuario registrado exitosamente', 'success')
-        return redirect(url_for('login'))
-
-    return render_template('registro_usuario.html')
 
 
 @app.route('/ingreso_curso', methods=['GET', 'POST'])
@@ -120,7 +92,6 @@ def ingreso_curso():
     if request.method == 'POST':
         grado_id = request.form.get('grado')
         curso_nombre = request.form.get('curso')
-
         if not grado_id or not curso_nombre:
             flash('Todos los campos son obligatorios.', 'danger')
             return redirect(url_for('ingreso_curso'))
@@ -142,9 +113,12 @@ def ingreso_curso():
         return redirect(url_for('consulta'))
 
     grados = Grado.query.all()
-    print("Grados encontrados:, grados")
     return render_template('ingreso_curso.html', grados=grados)
-    
+
+
+    # 🔧 Aquí sí obtenemos los grados para el template
+    grados = Grado.query.all()
+    return render_template('ingreso_curso.html', grados=grados)
 
 @app.route('/ingreso_estudiante', methods=['GET', 'POST'])
 def ingreso_estudiante():
@@ -156,8 +130,11 @@ def ingreso_estudiante():
         id_curso = request.form['id_curso']
 
         nuevo_estudiante = Estudiante(
-            nombre=nombre, apellido=apellido, correo=correo,
-            documento=documento, curso_id=id_curso
+            nombre=nombre,
+            apellido=apellido,
+            correo=correo,
+            documento=documento,
+            curso_id=id_curso
         )
 
         try:
@@ -167,11 +144,12 @@ def ingreso_estudiante():
         except Exception as e:
             db.session.rollback()
             flash(f'Error al guardar el estudiante: {str(e)}', 'danger')
-
         return redirect(url_for('index'))
 
-    cursos = Curso.query.all()
-    return render_template('ingreso_estudiante.html', cursos=cursos)
+    # 🔧 Aquí se obtienen los grados también para el select dinámico
+    grados = Grado.query.all()
+    return render_template('ingreso_estudiante.html', grados=grados)
+
 
 @app.route('/ingreso_notas', methods=['GET', 'POST'])
 def ingreso_notas():
@@ -180,25 +158,18 @@ def ingreso_notas():
         curso_id = request.form.get('curso')
         nota = request.form.get('nota')
         periodo = request.form.get('periodo')
-
         if not estudiante_id or not curso_id or nota is None or not periodo:
             flash("Todos los campos son obligatorios", "danger")
             return redirect(url_for('ingreso_notas'))
-
-        nueva_nota = Nota(
-            estudiante_id=estudiante_id,
-            curso_id=curso_id,
-            nota=nota,
-            periodo=periodo
-        )
+        nueva_nota = Nota(estudiante_id=estudiante_id, curso_id=curso_id, nota=nota, periodo=periodo)
         db.session.add(nueva_nota)
         db.session.commit()
         flash("Nota ingresada correctamente", "success")
         return redirect(url_for('ingreso_notas'))
-
     estudiantes = Estudiante.query.all()
     cursos = Curso.query.all()
-    return render_template('ingreso_notas.html', estudiantes=estudiantes, cursos=cursos)
+    grados = Grado.query.all()
+    return render_template('ingreso_notas.html', estudiantes=estudiantes, cursos=cursos, grados=grados)
 
 @app.route('/ingreso_materia', methods=['GET', 'POST'])
 def ingreso_materia():
@@ -213,26 +184,54 @@ def ingreso_materia():
         return redirect(url_for('index'))
     return render_template('ingreso_materia.html')
 
-
-
 @app.route('/consulta')
 def consulta():
-    estudiantes = Estudiante.query.all()
-    cursos = Curso.query.all()
-    grados = Grado.query.all()
-    print("Estudiantes:", estudiantes)
-    print("Cursos:", cursos)
-    print("Grados:", grados)
-    return render_template('consulta.html', estudiantes=estudiantes, cursos=cursos, grados=grados)
+    grados = Grado.query.options(
+        db.joinedload(Grado.cursos).joinedload(Curso.estudiantes).joinedload(Estudiante.notas)
+    ).all()
+    return render_template('consulta.html', grados=grados)
+
+@app.route('/cursos_por_grado/<int:grado_id>')
+def cursos_por_grado(grado_id):
+    cursos = Curso.query.filter_by(grado_id=grado_id).all()
+    cursos_data = [{'id': c.id, 'nombre': c.nombre} for c in cursos]
+    return jsonify(cursos_data)
+
+@app.route('/estudiantes_por_curso/<int:curso_id>')
+def estudiantes_por_curso(curso_id):
+    estudiantes = Estudiante.query.filter_by(curso_id=curso_id).all()
+    estudiantes_data = [{'id': e.id, 'nombre': e.nombre, 'apellido': e.apellido} for e in estudiantes]
+    return jsonify(estudiantes_data)
 
 
-    
+
+@app.route('/registro_usuario', methods=['GET', 'POST'])
+def registro_usuario():
+    if request.method == 'POST':
+        correo = request.form['correo']
+        contraseña = request.form['contraseña']
+        if not correo or not contraseña:
+            flash('Todos los campos son obligatorios.', 'danger')
+            return redirect(url_for('registro_usuario'))
+
+        usuario_existente = Usuario.query.filter_by(correo=correo).first()
+        if usuario_existente:
+            flash('El usuario ya existe.', 'danger')
+            return redirect(url_for('registro_usuario'))
+
+        nuevo_usuario = Usuario(correo=correo, contraseña=contraseña)
+        db.session.add(nuevo_usuario)
+        db.session.commit()
+        flash('Usuario registrado correctamente.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('registro_usuario.html')
 
 
-# Inicialización
 with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 

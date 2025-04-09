@@ -1,105 +1,102 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ingreso de Nota</title>
-
-    <!-- Bootstrap CSS -->
+    <title>Ingreso de Notas</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <!-- Icono -->
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
-<body>
+<body class="container mt-5">
 
-    <div class="container mt-5">
-        <h1 class="text-center">Ingreso de Nota</h1>
+    <h1>Ingreso de Notas</h1>
 
-        <!-- Formulario de ingreso de nota -->
-        <form action="{{ url_for('ingreso_notas') }}" method="POST" onsubmit="return validarFormulario()">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-            <!-- Mensajes Flash -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
-                        {{ message }}
-                    </div>
+    <form method="POST" action="{{ url_for('ingreso_notas') }}">
+        <div class="mb-3">
+            <label for="grado" class="form-label">Grado:</label>
+            <select id="grado" class="form-select" required>
+                <option value="">Selecciona un grado</option>
+                {% for grado in grados %}
+                    <option value="{{ grado.id }}">{{ grado.nombre }}</option>
                 {% endfor %}
-            {% endif %}
-            {% endwith %}
-
-            <!-- Campo de Estudiante -->
-            <div class="mb-3">
-                <label for="estudiante" class="form-label">Estudiante</label>
-                <select class="form-control" id="estudiante" name="estudiante" required>
-                    <option value="">Seleccionar Estudiante</option>
-                    {% for estudiante in estudiantes %}
-                        <option value="{{ estudiante.id }}">{{ estudiante.nombre }} {{ estudiante.apellido }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Campo de Curso -->
-            <div class="mb-3">
-                <label for="curso" class="form-label">Curso</label>
-                <select class="form-control" id="curso" name="curso" required>
-                    <option value="">Seleccionar Curso</option>
-                    {% for curso in cursos %}
-                        <option value="{{ curso.id }}">{{ curso.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Campo de Nota -->
-            <div class="mb-3">
-                <label for="nota" class="form-label">Nota</label>
-                <input type="number" class="form-control" id="nota" name="nota" min="0" max="10" required>
-            </div>
-
-            <!-- Campo de Periodo -->
-            <div class="mb-3">
-                <label for="periodo" class="form-label">Periodo</label>
-                <input type="text" class="form-control" id="periodo" name="periodo" required>
-            </div>
-
-            <!-- Botón de envío del formulario -->
-            <button type="submit" class="btn btn-primary w-100">Ingresar Nota</button>
-            
-        </form>
-
-        <!-- Enlace para volver -->
-        <div class="text-center mt-3">
-            <a href="{{ url_for('consulta') }}" class="btn btn-secondary">Volver a Consultas</a>
+            </select>
         </div>
-    </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <div class="mb-3">
+            <label for="curso" class="form-label">Curso:</label>
+            <select name="curso" id="curso" class="form-select" required>
+                <option value="">Selecciona un curso</option>
+            </select>
+        </div>
 
-    <!-- Validación del formulario -->
+        <div class="mb-3">
+            <label for="estudiante" class="form-label">Estudiante:</label>
+            <select name="estudiante" id="estudiante" class="form-select" required>
+                <option value="">Selecciona un estudiante</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="nota" class="form-label">Nota:</label>
+            <input type="text" name="nota" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="periodo" class="form-label">Periodo:</label>
+            <input type="text" name="periodo" class="form-control" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Registrar Nota</button>
+    </form>
+
     <script>
-        function validarFormulario() {
-            let estudiante = document.getElementById("estudiante").value;
-            let curso = document.getElementById("curso").value;
-            let nota = document.getElementById("nota").value;
-            let periodo = document.getElementById("periodo").value;
+        $(document).ready(function() {
+            $('#grado').change(function() {
+                var grado_id = $(this).val();
+                $('#curso').html('<option value="">Cargando cursos...</option>');
+                $('#estudiante').html('<option value="">Selecciona un estudiante</option>');
 
-            if (!estudiante || !curso || !nota || !periodo) {
-                alert("Por favor, completa todos los campos antes de enviar.");
-                return false;
-            }
+                if (grado_id) {
+                    $.getJSON('/cursos_por_grado/' + grado_id, function(data) {
+                        let options = '<option value="">Selecciona un curso</option>';
+                        data.forEach(function(curso) {
+                            options += `<option value="${curso.id}">${curso.nombre}</option>`;
+                        });
+                        $('#curso').html(options);
+                    });
+                } else {
+                    $('#curso').html('<option value="">Selecciona un curso</option>');
+                }
+            });
 
-            if (nota < 0 || nota > 10) {
-                alert("La nota debe estar entre 0 y 10.");
-                return false;
-            }
+            $('#curso').change(function() {
+                var curso_id = $(this).val();
+                $('#estudiante').html('<option value="">Cargando estudiantes...</option>');
 
-            return true;
-        }
+                if (curso_id) {
+                    $.getJSON('/estudiantes_por_curso/' + curso_id, function(data) {
+                        let options = '<option value="">Selecciona un estudiante</option>';
+                        data.forEach(function(estudiante) {
+                            options += `<option value="${estudiante.id}">${estudiante.nombre} ${estudiante.apellido}</option>`;
+                        });
+                        $('#estudiante').html(options);
+                    });
+                } else {
+                    $('#estudiante').html('<option value="">Selecciona un estudiante</option>');
+                }
+            });
+        });
     </script>
 </body>
 </html>
+
 
 
 
