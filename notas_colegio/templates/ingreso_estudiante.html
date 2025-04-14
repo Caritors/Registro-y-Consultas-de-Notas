@@ -4,20 +4,44 @@
     <meta charset="UTF-8">
     <title>Registro de Estudiante</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- jQuery necesario para AJAX -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#grado').change(function() {
+                var grado_id = $(this).val();
+                console.log("Grado seleccionado:", grado_id);  // Verifica qué grado se seleccionó
+                $('#id_curso').html('<option value="">Cargando cursos...</option>');
+    
+                // Si hay un grado seleccionado, realiza la solicitud
+                if (grado_id) {
+                    $.getJSON('/cursos_por_grado/' + grado_id, function(data) {
+                        console.log("Cursos recibidos:", data);  // Verifica los cursos recibidos
+                        let options = '<option value="">Selecciona un curso</option>';
+    
+                        // Si hay cursos, actualiza el select
+                        if (data.length > 0) {
+                            data.forEach(function(curso) {
+                                options += `<option value="${curso.id}">${curso.nombre}</option>`;
+                            });
+                            $('#id_curso').html(options);
+                        } else {
+                            $('#id_curso').html('<option value="">No hay cursos disponibles</option>');
+                        }
+                    }).fail(function(xhr, status, error) {
+                        console.error("Error al obtener cursos:", status, error);
+                        $('#id_curso').html('<option value="">Error al cargar cursos</option>');
+                    });
+                } else {
+                    $('#id_curso').html('<option value="">Selecciona un curso</option>');
+                }
+            });
+        });
+    </script>
+    
 </head>
-<body 
-
-
-
-    class="container mt-5">
+<body class="container mt-5">
     <h1>Registro de Estudiante</h1>
-
-    <!-- Logo centrado -->
-    <div class="text-center mt-4 mb-4">
-        <img src="{{ url_for('static', filename='img/logo_colegio') }}" alt="Logo del colegio" style="height: 100px;">
-        </div>
-    <div class="container mt-5">
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -26,9 +50,6 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
-
-    
-    
 
     <form method="POST" action="{{ url_for('ingreso_estudiante') }}">
         <div class="mb-3">
@@ -53,7 +74,8 @@
 
         <div class="mb-3">
             <label for="grado" class="form-label">Grado:</label>
-            <select id="grado" class="form-select" required>
+            <select id="grado" name="grado" class="form-select" required>
+
                 <option value="">Selecciona un grado</option>
                 {% for grado in grados %}
                     <option value="{{ grado.id }}">{{ grado.nombre }}</option>
@@ -65,25 +87,67 @@
             <label for="id_curso" class="form-label">Curso:</label>
             <select name="id_curso" id="id_curso" class="form-select" required>
                 <option value="">Selecciona un curso</option>
-                <!-- Cursos se llenan dinámicamente -->
+                {% for curso in cursos %}
+                    <option value="{{ curso.id }}">{{ curso.nombre }}</option>
+                {% endfor %}
             </select>
         </div>
 
         <button type="submit" class="btn btn-primary">Registrar Estudiante</button>
     </form>
 
+    <h2 class="mt-5">Lista de Estudiantes Registrados</h2>
+    <table class="table table-bordered mt-3">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Correo</th>
+                <th>Documento</th>
+                <th>Curso</th>
+                <th>Grado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for estudiante in estudiantes %}
+            <tr>
+                <td>{{ estudiante.nombre }}</td>
+                <td>{{ estudiante.apellido }}</td>
+                <td>{{ estudiante.correo }}</td>
+                <td>{{ estudiante.documento }}</td>
+                <td>{{ estudiante.curso.nombre }}</td>
+                <td>{{ estudiante.curso.grado.nombre }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Aquí va el código JavaScript -->
     <script>
         $(document).ready(function() {
             $('#grado').change(function() {
                 var grado_id = $(this).val();
+                console.log("Grado seleccionado:", grado_id);  // Verifica qué grado se seleccionó
                 $('#id_curso').html('<option value="">Cargando cursos...</option>');
+                
+                // Si hay un grado seleccionado, realiza la solicitud
                 if (grado_id) {
                     $.getJSON('/cursos_por_grado/' + grado_id, function(data) {
+                        console.log("Cursos recibidos:", data);  // Verifica los cursos recibidos
                         let options = '<option value="">Selecciona un curso</option>';
-                        data.forEach(function(curso) {
-                            options += `<option value="${curso.id}">${curso.nombre}</option>`;
-                        });
-                        $('#id_curso').html(options);
+                        
+                        // Si hay cursos, actualiza el select
+                        if (data.length > 0) {
+                            data.forEach(function(curso) {
+                                options += `<option value="${curso.id}">${curso.nombre}</option>`;
+                            });
+                            $('#id_curso').html(options);
+                        } else {
+                            $('#id_curso').html('<option value="">No hay cursos disponibles</option>');
+                        }
+                    }).fail(function(xhr, status, error) {
+                        console.error("Error al obtener cursos:", status, error);
+                        $('#id_curso').html('<option value="">Error al cargar cursos</option>');
                     });
                 } else {
                     $('#id_curso').html('<option value="">Selecciona un curso</option>');
@@ -91,8 +155,15 @@
             });
         });
     </script>
+    
 </body>
 </html>
+
+
+
+
+
+
 
 
 

@@ -21,8 +21,9 @@ class Curso(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
     grado_id = db.Column(db.Integer, db.ForeignKey('grado.id'), nullable=False)
-    estudiantes = db.relationship('Estudiante', backref='curso', lazy=True)
+    estudiantes = db.relationship('Estudiante', backref='curso', lazy=True, cascade="all, delete-orphan")
     notas = db.relationship('Nota', backref='curso', lazy=True)
+
 
 class Estudiante(db.Model):
     __tablename__ = 'estudiante'
@@ -55,6 +56,7 @@ class Usuario(db.Model):
     contraseña = db.Column(db.String(120), nullable=False)
 
 # RUTAS
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -85,7 +87,10 @@ def registro_grado():
             return redirect(url_for('index'))
     return render_template('registro_grado.html')
 
-
+@app.route('/lista_estudiantes')
+def lista_estudiantes():
+    estudiantes = Estudiante.query.all()
+    return render_template('lista_estudiantes.html', estudiantes=estudiantes)
 
 @app.route('/ingreso_curso', methods=['GET', 'POST'])
 def ingreso_curso():
@@ -115,11 +120,6 @@ def ingreso_curso():
     grados = Grado.query.all()
     return render_template('ingreso_curso.html', grados=grados)
 
-
-    # 🔧 Aquí sí obtenemos los grados para el template
-    grados = Grado.query.all()
-    return render_template('ingreso_curso.html', grados=grados)
-
 @app.route('/ingreso_estudiante', methods=['GET', 'POST'])
 def ingreso_estudiante():
     if request.method == 'POST':
@@ -144,12 +144,11 @@ def ingreso_estudiante():
         except Exception as e:
             db.session.rollback()
             flash(f'Error al guardar el estudiante: {str(e)}', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('ingreso_estudiante'))
 
-    # 🔧 Aquí se obtienen los grados también para el select dinámico
+    estudiantes = Estudiante.query.all()
     grados = Grado.query.all()
-    return render_template('ingreso_estudiante.html', grados=grados)
-
+    return render_template('ingreso_estudiante.html', grados=grados, estudiantes=estudiantes)
 
 @app.route('/ingreso_notas', methods=['GET', 'POST'])
 def ingreso_notas():
@@ -158,14 +157,17 @@ def ingreso_notas():
         curso_id = request.form.get('curso')
         nota = request.form.get('nota')
         periodo = request.form.get('periodo')
+
         if not estudiante_id or not curso_id or nota is None or not periodo:
             flash("Todos los campos son obligatorios", "danger")
             return redirect(url_for('ingreso_notas'))
+
         nueva_nota = Nota(estudiante_id=estudiante_id, curso_id=curso_id, nota=nota, periodo=periodo)
         db.session.add(nueva_nota)
         db.session.commit()
         flash("Nota ingresada correctamente", "success")
         return redirect(url_for('ingreso_notas'))
+
     estudiantes = Estudiante.query.all()
     cursos = Curso.query.all()
     grados = Grado.query.all()
@@ -177,11 +179,13 @@ def ingreso_materia():
         nombre = request.form['nombre']
         intensidad = request.form['intensidad_horaria']
         descripcion = request.form['descripcion']
+
         nueva = Materia(nombre=nombre, intensidad_horaria=intensidad, descripcion=descripcion)
         db.session.add(nueva)
         db.session.commit()
         flash('Materia registrada exitosamente', 'success')
         return redirect(url_for('index'))
+
     return render_template('ingreso_materia.html')
 
 @app.route('/consulta')
@@ -193,23 +197,33 @@ def consulta():
 
 @app.route('/cursos_por_grado/<int:grado_id>')
 def cursos_por_grado(grado_id):
+    # Consulta los cursos asociados al grado
     cursos = Curso.query.filter_by(grado_id=grado_id).all()
-    cursos_data = [{'id': c.id, 'nombre': c.nombre} for c in cursos]
+    
+    # Verifica cuántos cursos se están recuperando
+    print(f"Se encontraron {len(cursos)} cursos para el grado ID {grado_id}")
+    
+    # Prepara los datos para enviar como JSON
+    cursos_data = [{'id': curso.id, 'nombre': curso.nombre} for curso in cursos]
+    
+    # Devuelve los datos en formato JSON
     return jsonify(cursos_data)
 
+
+
+# 🔄 Devuelve estudiantes por curso en JSON
 @app.route('/estudiantes_por_curso/<int:curso_id>')
 def estudiantes_por_curso(curso_id):
     estudiantes = Estudiante.query.filter_by(curso_id=curso_id).all()
     estudiantes_data = [{'id': e.id, 'nombre': e.nombre, 'apellido': e.apellido} for e in estudiantes]
     return jsonify(estudiantes_data)
 
-
-
 @app.route('/registro_usuario', methods=['GET', 'POST'])
 def registro_usuario():
     if request.method == 'POST':
         correo = request.form['correo']
         contraseña = request.form['contraseña']
+
         if not correo or not contraseña:
             flash('Todos los campos son obligatorios.', 'danger')
             return redirect(url_for('registro_usuario'))
@@ -227,11 +241,12 @@ def registro_usuario():
 
     return render_template('registro_usuario.html')
 
-
+# Inicializar tablas
 with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
