@@ -8,7 +8,12 @@
 </head>
 <body>
     <div class="container mt-5">
-        <h1>Registro de Grado</h1>
+       <!-- Logo centrado -->
+    <div class="text-center mt-4 mb-4">
+        <img src="{{ url_for('static', filename='img/logo_colegio') }}" alt="Logo del colegio" style="height: 100px;">
+        </div>
+    <div class="container mt-5">
+        </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}

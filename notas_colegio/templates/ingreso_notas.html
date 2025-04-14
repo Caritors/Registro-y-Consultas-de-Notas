@@ -9,6 +9,10 @@
 <body class="container mt-5">
 
     <h1>Ingreso de Notas</h1>
+    <!-- Logo centrado -->
+    <div class="text-center mt-4 mb-4">
+        <img src="{{ url_for('static', filename='img/logo_colegio') }}" alt="Logo del colegio" style="height: 100px;">
+        </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
