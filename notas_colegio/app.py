@@ -24,7 +24,6 @@ class Curso(db.Model):
     estudiantes = db.relationship('Estudiante', backref='curso', lazy=True, cascade="all, delete-orphan")
     notas = db.relationship('Nota', backref='curso', lazy=True)
 
-
 class Estudiante(db.Model):
     __tablename__ = 'estudiante'
     id = db.Column(db.Integer, primary_key=True)
@@ -41,6 +40,8 @@ class Materia(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     intensidad_horaria = db.Column(db.String(100), nullable=False)
     descripcion = db.Column(db.String(255), nullable=False)
+    curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'))
+    curso = db.relationship('Curso', backref='materias')
 
 class Nota(db.Model):
     __tablename__ = 'nota'
@@ -56,7 +57,6 @@ class Usuario(db.Model):
     contraseña = db.Column(db.String(120), nullable=False)
 
 # RUTAS
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -90,7 +90,7 @@ def registro_grado():
 @app.route('/lista_estudiantes')
 def lista_estudiantes():
     estudiantes = Estudiante.query.all()
-    return render_template('lista_estudiantes.html', estudiantes=estudiantes)
+    return render_template('consulta.html', estudiantes=estudiantes)
 
 @app.route('/ingreso_curso', methods=['GET', 'POST'])
 def ingreso_curso():
@@ -150,6 +150,11 @@ def ingreso_estudiante():
     grados = Grado.query.all()
     return render_template('ingreso_estudiante.html', grados=grados, estudiantes=estudiantes)
 
+@app.route('/lista_materias')
+def lista_materias():
+    materias = Materia.query.all()
+    return render_template('lista_materias.html', materias=materias)
+
 @app.route('/ingreso_notas', methods=['GET', 'POST'])
 def ingreso_notas():
     if request.method == 'POST':
@@ -177,16 +182,32 @@ def ingreso_notas():
 def ingreso_materia():
     if request.method == 'POST':
         nombre = request.form['nombre']
-        intensidad = request.form['intensidad_horaria']
+        intensidad_horaria = request.form['intensidad_horaria']
         descripcion = request.form['descripcion']
+        curso_id = request.form.get('curso_id')
 
-        nueva = Materia(nombre=nombre, intensidad_horaria=intensidad, descripcion=descripcion)
-        db.session.add(nueva)
+        # Verificar que todos los campos estén completos
+        if not curso_id or not nombre or not intensidad_horaria or not descripcion:
+            flash('Todos los campos son obligatorios', 'danger')
+            return redirect(url_for('ingreso_materia'))
+
+        # Crear y guardar la nueva materia
+        nueva_materia = Materia(
+            nombre=nombre,
+            intensidad_horaria=intensidad_horaria,
+            descripcion=descripcion,
+            curso_id=curso_id
+        )
+        db.session.add(nueva_materia)
         db.session.commit()
         flash('Materia registrada exitosamente', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('lista_materias'))  # Redirigir a la lista de materias
 
-    return render_template('ingreso_materia.html')
+    # Obtener todos los grados con sus respectivos cursos
+    grados = Grado.query.all()
+    return render_template('ingreso_materia.html', grados=grados)
+
+
 
 @app.route('/consulta')
 def consulta():
@@ -208,8 +229,6 @@ def cursos_por_grado(grado_id):
     
     # Devuelve los datos en formato JSON
     return jsonify(cursos_data)
-
-
 
 # 🔄 Devuelve estudiantes por curso en JSON
 @app.route('/estudiantes_por_curso/<int:curso_id>')
@@ -247,6 +266,7 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 

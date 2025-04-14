@@ -2,39 +2,78 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Estudiantes</title>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
-<body class="container mt-5">
-    <h1>Lista de Estudiantes Registrados</h1>
+<body>
 
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Apellido</th>
-                <th>Correo</th>
-                <th>Documento</th>
-                <th>Curso</th>
-                <th>Grado</th>  <!-- Agregar columna para el grado -->
-            </tr>
-        </thead>
-        <tbody>
-            {% for estudiante in estudiantes %}
-            <tr>
-                <td>{{ estudiante.nombre }}</td>
-                <td>{{ estudiante.apellido }}</td>
-                <td>{{ estudiante.correo }}</td>
-                <td>{{ estudiante.documento }}</td>
-                <td>{{ estudiante.curso.grado.nombre }}</td>  <!-- Mostrar el nombre del grado relacionado -->
-                <td>{{ estudiante.curso.nombre }}</td>  <!-- Mostrar el nombre del curso relacionado -->
-                
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- Logo -->
+    <div class="text-center mt-4 mb-4">
+        <img src="{{ url_for('static', filename='img/logo_colegio') }}" alt="Logo del colegio" style="height: 100px;">
+    </div>
 
-    <a href="{{ url_for('index') }}" class="btn btn-primary">Volver al Inicio</a>
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">Lista de Estudiantes Registrados</h2>
+
+        <!-- Buscador -->
+        <div class="mb-4">
+            <input type="text" class="form-control" id="buscador" placeholder="Buscar por nombre, apellido o documento...">
+        </div>
+
+        <!-- Tabla -->
+        <table class="table table-striped table-hover text-center align-middle" id="tablaEstudiantes">
+            <thead class="table-dark">
+                <tr>
+                    <th>Nombre</th>
+                    <th>Apellido</th>
+                    <th>Correo</th>
+                    <th>Documento</th>
+                    <th>Grado</th>
+                    <th>Curso</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for estudiante in estudiantes %}
+                <tr>
+                    <td>{{ estudiante.nombre }}</td>
+                    <td>{{ estudiante.apellido }}</td>
+                    <td>{{ estudiante.correo }}</td>
+                    <td>{{ estudiante.documento }}</td>
+                    <td>{{ estudiante.curso.grado.nombre }}</td>
+                    <td>{{ estudiante.curso.nombre }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver al Inicio</a>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS y Buscador -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const buscador = document.getElementById('buscador');
+        const tabla = document.getElementById('tablaEstudiantes').getElementsByTagName('tbody')[0];
+
+        buscador.addEventListener('keyup', function() {
+            const filtro = buscador.value.toLowerCase();
+            const filas = tabla.getElementsByTagName('tr');
+
+            for (let i = 0; i < filas.length; i++) {
+                const fila = filas[i];
+                const texto = fila.textContent.toLowerCase();
+                fila.style.display = texto.includes(filtro) ? '' : 'none';
+            }
+        });
+    </script>
 </body>
 </html>
+
+
+
 

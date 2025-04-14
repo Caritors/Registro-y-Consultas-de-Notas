@@ -74,8 +74,7 @@
 
         <div class="mb-3">
             <label for="grado" class="form-label">Grado:</label>
-            <select id="grado" name="grado" class="form-select" required>
-
+            <select id="grado" class="form-select" required>
                 <option value="">Selecciona un grado</option>
                 {% for grado in grados %}
                     <option value="{{ grado.id }}">{{ grado.nombre }}</option>
@@ -88,7 +87,7 @@
             <select name="id_curso" id="id_curso" class="form-select" required>
                 <option value="">Selecciona un curso</option>
                 {% for curso in cursos %}
-                    <option value="{{ curso.id }}">{{ curso.nombre }}</option>
+                    <option value="{{ curso.id }}">{{ grado.nombre }}</option>
                 {% endfor %}
             </select>
         </div>
