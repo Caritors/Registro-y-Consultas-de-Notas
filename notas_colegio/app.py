@@ -209,6 +209,7 @@ def ingreso_materia():
 
 
 
+
 @app.route('/consulta')
 def consulta():
     grados = Grado.query.options(
@@ -259,6 +260,20 @@ def registro_usuario():
         return redirect(url_for('login'))
 
     return render_template('registro_usuario.html')
+
+@app.route('/consulta_estudiantes')
+def consulta_estudiantes():
+    estudiantes = Estudiante.query.join(Curso).join(Grado).all()
+    return render_template('consulta_estudiantes.html', estudiantes=estudiantes)
+
+@app.route('/materias_registradas')
+def materias_registradas():
+    grados = Grado.query.options(
+        db.joinedload(Grado.cursos).joinedload(Curso.materias)
+    ).all()
+    return render_template('materias_registradas.html', grados=grados)
+
+
 
 # Inicializar tablas
 with app.app_context():
