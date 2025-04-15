@@ -16,6 +16,14 @@ class Grado(db.Model):
     nombre = db.Column(db.String(100), nullable=False, unique=True)
     cursos = db.relationship('Curso', backref='grado', lazy=True)
 
+    # Método para serializar el objeto Grado a diccionario
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'cursos': [curso.to_dict() for curso in self.cursos]  # Convertir los cursos relacionados
+        }
+
 class Curso(db.Model):
     __tablename__ = 'curso'
     id = db.Column(db.Integer, primary_key=True)
@@ -23,6 +31,17 @@ class Curso(db.Model):
     grado_id = db.Column(db.Integer, db.ForeignKey('grado.id'), nullable=False)
     estudiantes = db.relationship('Estudiante', backref='curso', lazy=True, cascade="all, delete-orphan")
     notas = db.relationship('Nota', backref='curso', lazy=True)
+
+    # Método para serializar el objeto Curso a diccionario
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'grado_id': self.grado_id,
+            'estudiantes': [estudiante.to_dict() for estudiante in self.estudiantes],  # Convertir estudiantes relacionados
+            'notas': [nota.to_dict() for nota in self.notas]  # Convertir notas relacionadas
+        }
+
 
 class Estudiante(db.Model):
     __tablename__ = 'estudiante'
@@ -50,6 +69,11 @@ class Nota(db.Model):
     periodo = db.Column(db.String(100), nullable=False)
     estudiante_id = db.Column(db.Integer, db.ForeignKey('estudiante.id'), nullable=False)
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'), nullable=False)
+
+    # Elimina o comenta esta línea duplicada
+    # estudiante = db.relationship('Estudiante', backref='notas')  # Esta línea es innecesaria
+
+
 
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -184,14 +208,8 @@ def ingreso_materia():
         nombre = request.form['nombre']
         intensidad_horaria = request.form['intensidad_horaria']
         descripcion = request.form['descripcion']
-        curso_id = request.form.get('curso_id')
+        curso_id = request.form['curso_id']
 
-        # Verificar que todos los campos estén completos
-        if not curso_id or not nombre or not intensidad_horaria or not descripcion:
-            flash('Todos los campos son obligatorios', 'danger')
-            return redirect(url_for('ingreso_materia'))
-
-        # Crear y guardar la nueva materia
         nueva_materia = Materia(
             nombre=nombre,
             intensidad_horaria=intensidad_horaria,
@@ -200,12 +218,14 @@ def ingreso_materia():
         )
         db.session.add(nueva_materia)
         db.session.commit()
-        flash('Materia registrada exitosamente', 'success')
-        return redirect(url_for('lista_materias'))  # Redirigir a la lista de materias
 
-    # Obtener todos los grados con sus respectivos cursos
-    grados = Grado.query.all()
+        flash('Materia registrada exitosamente', 'success')
+        return redirect(url_for('materias_registradas'))  # Redirige después de guardar
+
+    # Si es GET, mostrar formulario
+    grados = Grado.query.options(db.joinedload(Grado.cursos)).all()
     return render_template('ingreso_materia.html', grados=grados)
+
 
 
 
@@ -272,6 +292,38 @@ def materias_registradas():
         db.joinedload(Grado.cursos).joinedload(Curso.materias)
     ).all()
     return render_template('materias_registradas.html', grados=grados)
+
+@app.route('/notas_registradas', methods=['GET'])
+def notas_registradas():
+    grados = Grado.query.options(db.joinedload(Grado.cursos)).all()
+
+    # Convertir grados y cursos a diccionarios
+    grados_data = [grado.to_dict() for grado in grados]
+
+    grado_id = request.args.get('grado')
+    curso_id = request.args.get('curso')
+    buscar = request.args.get('buscar', '').strip().lower()
+
+    query = Nota.query.join(Estudiante).join(Curso).join(Grado)
+
+    if grado_id:
+        query = query.filter(Curso.grado_id == grado_id)
+    if curso_id:
+        query = query.filter(Nota.curso_id == curso_id)
+    if buscar:
+        query = query.filter(
+            (Estudiante.nombre.ilike(f'%{buscar}%')) |
+            (Estudiante.apellido.ilike(f'%{buscar}%'))
+        )
+
+    notas = query.all()
+
+    # Puedes convertir las notas a diccionario aquí si es necesario
+    notas_data = [nota.to_dict() for nota in notas]
+
+    return render_template('notas_registradas.html', notas=notas_data, grados=grados_data, grado_id=grado_id, curso_id=curso_id, buscar=buscar)
+
+
 
 
 
