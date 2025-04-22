@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Estudiantes Registrados</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+    <!-- Logo centrado -->
+    <div class="text-center mt-4 mb-4">
+        <img src="{{ url_for('static', filename='img/logo_colegio.png') }}" alt="Logo del colegio" style="height: 100px;">
+    </div>
+
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Lista de Estudiantes Registrados</h1>
+
+        <!-- Tabla de estudiantes -->
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Apellido</th>
+                    <th>Correo</th>
+                    <th>Documento</th>
+                    <th>Curso</th>
+                    <th>Grado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for estudiante in estudiantes %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ estudiante.nombre }}</td>
+                    <td>{{ estudiante.apellido }}</td>
+                    <td>{{ estudiante.correo }}</td>
+                    <td>{{ estudiante.documento }}</td>
+                    <td>{{ estudiante.curso.nombre }}</td>
+                    <td>{{ estudiante.curso.grado.nombre }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+    </div>
+</body>
+</html>

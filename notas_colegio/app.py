@@ -150,6 +150,45 @@ def registro_grado():
             return redirect(url_for('index'))
     return render_template('registro_grado.html')
 
+@app.route('/registrar_nota', methods=['GET', 'POST'])
+def registrar_nota():
+    if request.method == 'POST':
+        grado_id = request.form['grado']
+        curso_id = request.form['curso']
+        estudiante_id = request.form['estudiante']
+        nota = request.form['nota']
+        periodo = request.form['periodo']
+        
+        # Guardar la nueva nota en la base de datos
+        nueva_nota = Nota(
+            curso_id=curso_id,
+            estudiante_id=estudiante_id,
+            nota=nota,
+            periodo=periodo
+        )
+        db.session.add(nueva_nota)
+        db.session.commit()
+        
+        # Redirigir a la página de notas registradas
+        return redirect(url_for('notas_registradas'))
+    
+    # Consultar todos los grados con cursos y estudiantes
+    grados = Grado.query.options(db.joinedload(Grado.cursos).joinedload(Curso.estudiantes)).all()
+
+    # Transformar los datos en un formato adecuado para JavaScript
+    grados_data = [
+        {
+            'id': g.id,
+            'nombre': g.nombre,
+            'cursos': [{'id': c.id, 'nombre': c.nombre, 'estudiantes': [{'id': e.id, 'nombre': e.nombre, 'apellido': e.apellido} for e in c.estudiantes]} for c in g.cursos]
+        }
+        for g in grados
+    ]
+    
+    return render_template('registrar_nota.html', grados=grados_data)
+
+
+
 @app.route('/ingreso_curso', methods=['GET', 'POST'])
 def ingreso_curso():
     if request.method == 'POST':
@@ -262,6 +301,12 @@ def estudiantes_por_curso(curso_id):
 def consulta_estudiantes():
     estudiantes = Estudiante.query.join(Curso).join(Grado).all()
     return render_template('consulta_estudiantes.html', estudiantes=estudiantes)
+
+@app.route('/lista_estudiantes')
+def lista_estudiantes():
+    # Código para obtener la lista de estudiantes
+    return render_template('lista_estudiantes.html')
+
 
 # Crear las tablas en la base de datos
 with app.app_context():

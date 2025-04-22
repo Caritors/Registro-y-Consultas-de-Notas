@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registrar Nota</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+    <!-- Logo centrado -->
+    <div class="text-center mt-4 mb-4">
+        <img src="{{ url_for('static', filename='img/logo_colegio') }}" alt="Logo del colegio" style="height: 100px;">
+    </div>
+
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Registrar Nota</h1>
+
+        <!-- Formulario para registrar nota -->
+        <form method="POST" action="{{ url_for('registrar_nota') }}">
+            <!-- Grado -->
+            <div class="mb-3">
+                <label for="grado" class="form-label">Grado</label>
+                <select name="grado" id="grado" class="form-select" required>
+                    <option value="">Seleccionar Grado</option>
+                    {% for grado in grados %}
+                        <option value="{{ grado.id }}">{{ grado.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Curso -->
+            <div class="mb-3">
+                <label for="curso" class="form-label">Curso</label>
+                <select name="curso" id="curso" class="form-select" required>
+                    <option value="">Seleccionar Curso</option>
+                </select>
+            </div>
+
+            <!-- Estudiante -->
+            <div class="mb-3">
+                <label for="estudiante" class="form-label">Estudiante</label>
+                <select name="estudiante" id="estudiante" class="form-select" required>
+                    <option value="">Seleccionar Estudiante</option>
+                </select>
+            </div>
+
+            <!-- Nota -->
+            <div class="mb-3">
+                <label for="nota" class="form-label">Nota</label>
+                <input type="number" name="nota" id="nota" class="form-control" required min="0" max="10" step="0.1">
+            </div>
+
+            <!-- Periodo -->
+            <div class="mb-3">
+                <label for="periodo" class="form-label">Periodo</label>
+                <input type="text" name="periodo" id="periodo" class="form-control" required>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('notas_registradas') }}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Registrar Nota</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Script para cargar cursos y estudiantes según grado -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        const grados = {{ grados|tojson }};
+
+        // Cargar los cursos al seleccionar un grado
+        $('#grado').on('change', function() {
+            const gradoId = $(this).val();
+            const $curso = $('#curso');
+            const $estudiante = $('#estudiante');
+            $curso.empty().append('<option value="">Seleccionar Curso</option>');
+            $estudiante.empty().append('<option value="">Seleccionar Estudiante</option>');
+            
+            if (gradoId) {
+                const grado = grados.find(g => g.id == gradoId);
+                grado.cursos.forEach(curso => {
+                    $curso.append(`<option value="${curso.id}">${curso.nombre}</option>`);
+                });
+            }
+        });
+
+        // Cargar estudiantes al seleccionar un curso
+        $('#curso').on('change', function() {
+            const cursoId = $(this).val();
+            const $estudiante = $('#estudiante');
+            $estudiante.empty().append('<option value="">Seleccionar Estudiante</option>');
+
+            if (cursoId) {
+                const gradoId = $('#grado').val();
+                const grado = grados.find(g => g.id == gradoId);
+                const curso = grado.cursos.find(c => c.id == cursoId);
+                curso.estudiantes.forEach(estudiante => {
+                    $estudiante.append(`<option value="${estudiante.id}">${estudiante.nombre} ${estudiante.apellido}</option>`);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
