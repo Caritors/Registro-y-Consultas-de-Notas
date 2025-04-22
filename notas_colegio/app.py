@@ -6,6 +6,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/notas_colegio_2'
 app.config['SECRET_KEY'] = 'tu_clave_secreta'
 
+# Inicializar extensiones
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -16,12 +17,11 @@ class Grado(db.Model):
     nombre = db.Column(db.String(100), nullable=False, unique=True)
     cursos = db.relationship('Curso', backref='grado', lazy=True)
 
-    # Método para serializar el objeto Grado a diccionario
     def to_dict(self):
         return {
             'id': self.id,
             'nombre': self.nombre,
-            'cursos': [curso.to_dict() for curso in self.cursos]  # Convertir los cursos relacionados
+            'cursos': [curso.to_dict() for curso in self.cursos]
         }
 
 class Curso(db.Model):
@@ -31,17 +31,16 @@ class Curso(db.Model):
     grado_id = db.Column(db.Integer, db.ForeignKey('grado.id'), nullable=False)
     estudiantes = db.relationship('Estudiante', backref='curso', lazy=True, cascade="all, delete-orphan")
     notas = db.relationship('Nota', backref='curso', lazy=True)
+    materias = db.relationship('Materia', backref='curso', lazy=True)
 
-    # Método para serializar el objeto Curso a diccionario
     def to_dict(self):
         return {
             'id': self.id,
             'nombre': self.nombre,
             'grado_id': self.grado_id,
-            'estudiantes': [estudiante.to_dict() for estudiante in self.estudiantes],  # Convertir estudiantes relacionados
-            'notas': [nota.to_dict() for nota in self.notas]  # Convertir notas relacionadas
+            'estudiantes': [e.to_dict() for e in self.estudiantes],
+            'notas': [n.to_dict() for n in self.notas]
         }
-
 
 class Estudiante(db.Model):
     __tablename__ = 'estudiante'
@@ -53,6 +52,16 @@ class Estudiante(db.Model):
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'), nullable=False)
     notas = db.relationship('Nota', backref='estudiante', lazy=True)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'apellido': self.apellido,
+            'correo': self.correo,
+            'documento': self.documento,
+            'curso_id': self.curso_id
+        }
+
 class Materia(db.Model):
     __tablename__ = 'materia'
     id = db.Column(db.Integer, primary_key=True)
@@ -60,7 +69,6 @@ class Materia(db.Model):
     intensidad_horaria = db.Column(db.String(100), nullable=False)
     descripcion = db.Column(db.String(255), nullable=False)
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'))
-    curso = db.relationship('Curso', backref='materias')
 
 class Nota(db.Model):
     __tablename__ = 'nota'
@@ -70,17 +78,33 @@ class Nota(db.Model):
     estudiante_id = db.Column(db.Integer, db.ForeignKey('estudiante.id'), nullable=False)
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'), nullable=False)
 
-    # Elimina o comenta esta línea duplicada
-    # estudiante = db.relationship('Estudiante', backref='notas')  # Esta línea es innecesaria
-
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nota': self.nota,
+            'periodo': self.periodo,
+            'estudiante_id': self.estudiante_id,
+            'curso_id': self.curso_id,
+            'estudiante': {
+            'nombre': self.estudiante.nombre,
+            'apellido': self.estudiante.apellido
+        } if self.estudiante else None,
+        'curso': {
+            'nombre': self.curso.nombre,
+            'grado': {
+                'id': self.curso.grado.id,
+                'nombre': self.curso.grado.nombre
+            } if self.curso and self.curso.grado else None
+        } if self.curso else None
+    }
 
 
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     correo = db.Column(db.String(120), unique=True, nullable=False)
-    contraseña = db.Column(db.String(120), nullable=False)
+    contrasena = db.Column(db.String(120), nullable=False)
 
-# RUTAS
+# RUTAS PRINCIPALES
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -89,13 +113,29 @@ def index():
 def login():
     if request.method == 'POST':
         correo = request.form['correo']
-        contraseña = request.form['contraseña']
+        contrasena = request.form['contrasena']
         usuario = Usuario.query.filter_by(correo=correo).first()
-        if usuario and usuario.contraseña == contraseña:
+        if usuario and usuario.contrasena == contrasena:
             flash('Inicio de sesión exitoso', 'success')
             return redirect(url_for('index'))
         flash('Correo o contraseña incorrectos', 'danger')
     return render_template('login.html')
+
+@app.route('/registro_usuario', methods=['GET', 'POST'])
+def registro_usuario():
+    if request.method == 'POST':
+        correo = request.form['correo']
+        contrasena = request.form['contrasena']
+        if not correo or not contrasena:
+            flash('Todos los campos son obligatorios.', 'danger')
+        elif Usuario.query.filter_by(correo=correo).first():
+            flash('El usuario ya existe.', 'danger')
+        else:
+            db.session.add(Usuario(correo=correo, contrasena=contrasena))
+            db.session.commit()
+            flash('Usuario registrado correctamente.', 'success')
+            return redirect(url_for('login'))
+    return render_template('registro_usuario.html')
 
 @app.route('/registro_grado', methods=['GET', 'POST'])
 def registro_grado():
@@ -104,208 +144,93 @@ def registro_grado():
         if not nombre:
             flash('El nombre del grado es obligatorio', 'danger')
         else:
-            nuevo_grado = Grado(nombre=nombre)
-            db.session.add(nuevo_grado)
+            db.session.add(Grado(nombre=nombre))
             db.session.commit()
             flash('Grado registrado exitosamente', 'success')
             return redirect(url_for('index'))
     return render_template('registro_grado.html')
 
-@app.route('/lista_estudiantes')
-def lista_estudiantes():
-    estudiantes = Estudiante.query.all()
-    return render_template('consulta.html', estudiantes=estudiantes)
-
 @app.route('/ingreso_curso', methods=['GET', 'POST'])
 def ingreso_curso():
     if request.method == 'POST':
-        grado_id = request.form.get('grado')
-        curso_nombre = request.form.get('curso')
+        grado_id = request.form['grado']
+        curso_nombre = request.form['curso']
         if not grado_id or not curso_nombre:
             flash('Todos los campos son obligatorios.', 'danger')
-            return redirect(url_for('ingreso_curso'))
-
-        grado = Grado.query.get(int(grado_id))
-        if not grado:
-            flash('Grado no encontrado.', 'danger')
-            return redirect(url_for('ingreso_curso'))
-
-        curso_existente = Curso.query.filter_by(nombre=curso_nombre, grado_id=grado.id).first()
-        if curso_existente:
+        elif Curso.query.filter_by(nombre=curso_nombre, grado_id=grado_id).first():
             flash('El curso ya existe en este grado.', 'danger')
-            return redirect(url_for('ingreso_curso'))
-
-        nuevo_curso = Curso(nombre=curso_nombre, grado_id=grado.id)
-        db.session.add(nuevo_curso)
-        db.session.commit()
-        flash('Curso registrado exitosamente.', 'success')
-        return redirect(url_for('consulta'))
-
+        else:
+            db.session.add(Curso(nombre=curso_nombre, grado_id=grado_id))
+            db.session.commit()
+            flash('Curso registrado exitosamente.', 'success')
+            return redirect(url_for('consulta'))
     grados = Grado.query.all()
     return render_template('ingreso_curso.html', grados=grados)
 
 @app.route('/ingreso_estudiante', methods=['GET', 'POST'])
 def ingreso_estudiante():
     if request.method == 'POST':
-        nombre = request.form['nombre']
-        apellido = request.form['apellido']
-        correo = request.form['correo']
-        documento = request.form['documento']
-        id_curso = request.form['id_curso']
-
-        nuevo_estudiante = Estudiante(
-            nombre=nombre,
-            apellido=apellido,
-            correo=correo,
-            documento=documento,
-            curso_id=id_curso
+        nuevo = Estudiante(
+            nombre=request.form['nombre'],
+            apellido=request.form['apellido'],
+            correo=request.form['correo'],
+            documento=request.form['documento'],
+            curso_id=request.form['id_curso']
         )
-
         try:
-            db.session.add(nuevo_estudiante)
+            db.session.add(nuevo)
             db.session.commit()
             flash('Estudiante registrado exitosamente', 'success')
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al guardar el estudiante: {str(e)}', 'danger')
+            flash(f'Error al guardar: {e}', 'danger')
         return redirect(url_for('ingreso_estudiante'))
-
-    estudiantes = Estudiante.query.all()
-    grados = Grado.query.all()
-    return render_template('ingreso_estudiante.html', grados=grados, estudiantes=estudiantes)
-
-@app.route('/lista_materias')
-def lista_materias():
-    materias = Materia.query.all()
-    return render_template('lista_materias.html', materias=materias)
-
-@app.route('/ingreso_notas', methods=['GET', 'POST'])
-def ingreso_notas():
-    if request.method == 'POST':
-        estudiante_id = request.form.get('estudiante')
-        curso_id = request.form.get('curso')
-        nota = request.form.get('nota')
-        periodo = request.form.get('periodo')
-
-        if not estudiante_id or not curso_id or nota is None or not periodo:
-            flash("Todos los campos son obligatorios", "danger")
-            return redirect(url_for('ingreso_notas'))
-
-        nueva_nota = Nota(estudiante_id=estudiante_id, curso_id=curso_id, nota=nota, periodo=periodo)
-        db.session.add(nueva_nota)
-        db.session.commit()
-        flash("Nota ingresada correctamente", "success")
-        return redirect(url_for('ingreso_notas'))
-
-    estudiantes = Estudiante.query.all()
-    cursos = Curso.query.all()
-    grados = Grado.query.all()
-    return render_template('ingreso_notas.html', estudiantes=estudiantes, cursos=cursos, grados=grados)
+    return render_template('ingreso_estudiante.html', grados=Grado.query.all(), estudiantes=Estudiante.query.all())
 
 @app.route('/ingreso_materia', methods=['GET', 'POST'])
 def ingreso_materia():
     if request.method == 'POST':
-        nombre = request.form['nombre']
-        intensidad_horaria = request.form['intensidad_horaria']
-        descripcion = request.form['descripcion']
-        curso_id = request.form['curso_id']
-
-        nueva_materia = Materia(
-            nombre=nombre,
-            intensidad_horaria=intensidad_horaria,
-            descripcion=descripcion,
-            curso_id=curso_id
+        materia = Materia(
+            nombre=request.form['nombre'],
+            intensidad_horaria=request.form['intensidad_horaria'],
+            descripcion=request.form['descripcion'],
+            curso_id=request.form['curso_id']
         )
-        db.session.add(nueva_materia)
+        db.session.add(materia)
         db.session.commit()
-
         flash('Materia registrada exitosamente', 'success')
-        return redirect(url_for('materias_registradas'))  # Redirige después de guardar
+        return redirect(url_for('materias_registradas'))
+    return render_template('ingreso_materia.html', grados=Grado.query.options(db.joinedload(Grado.cursos)).all())
 
-    # Si es GET, mostrar formulario
-    grados = Grado.query.options(db.joinedload(Grado.cursos)).all()
-    return render_template('ingreso_materia.html', grados=grados)
-
-
-
-
+@app.route('/ingreso_notas', methods=['GET', 'POST'])
+def ingreso_notas():
+    if request.method == 'POST':
+        nueva = Nota(
+            estudiante_id=request.form['estudiante'],
+            curso_id=request.form['curso'],
+            nota=request.form['nota'],
+            periodo=request.form['periodo']
+        )
+        db.session.add(nueva)
+        db.session.commit()
+        flash('Nota ingresada correctamente', 'success')
+        return redirect(url_for('ingreso_notas'))
+    return render_template('ingreso_notas.html', estudiantes=Estudiante.query.all(), cursos=Curso.query.all(), grados=Grado.query.all())
 
 @app.route('/consulta')
 def consulta():
-    grados = Grado.query.options(
-        db.joinedload(Grado.cursos).joinedload(Curso.estudiantes).joinedload(Estudiante.notas)
-    ).all()
+    grados = Grado.query.options(db.joinedload(Grado.cursos).joinedload(Curso.estudiantes).joinedload(Estudiante.notas)).all()
     return render_template('consulta.html', grados=grados)
 
-@app.route('/cursos_por_grado/<int:grado_id>')
-def cursos_por_grado(grado_id):
-    # Consulta los cursos asociados al grado
-    cursos = Curso.query.filter_by(grado_id=grado_id).all()
-    
-    # Verifica cuántos cursos se están recuperando
-    print(f"Se encontraron {len(cursos)} cursos para el grado ID {grado_id}")
-    
-    # Prepara los datos para enviar como JSON
-    cursos_data = [{'id': curso.id, 'nombre': curso.nombre} for curso in cursos]
-    
-    # Devuelve los datos en formato JSON
-    return jsonify(cursos_data)
-
-# 🔄 Devuelve estudiantes por curso en JSON
-@app.route('/estudiantes_por_curso/<int:curso_id>')
-def estudiantes_por_curso(curso_id):
-    estudiantes = Estudiante.query.filter_by(curso_id=curso_id).all()
-    estudiantes_data = [{'id': e.id, 'nombre': e.nombre, 'apellido': e.apellido} for e in estudiantes]
-    return jsonify(estudiantes_data)
-
-@app.route('/registro_usuario', methods=['GET', 'POST'])
-def registro_usuario():
-    if request.method == 'POST':
-        correo = request.form['correo']
-        contraseña = request.form['contraseña']
-
-        if not correo or not contraseña:
-            flash('Todos los campos son obligatorios.', 'danger')
-            return redirect(url_for('registro_usuario'))
-
-        usuario_existente = Usuario.query.filter_by(correo=correo).first()
-        if usuario_existente:
-            flash('El usuario ya existe.', 'danger')
-            return redirect(url_for('registro_usuario'))
-
-        nuevo_usuario = Usuario(correo=correo, contraseña=contraseña)
-        db.session.add(nuevo_usuario)
-        db.session.commit()
-        flash('Usuario registrado correctamente.', 'success')
-        return redirect(url_for('login'))
-
-    return render_template('registro_usuario.html')
-
-@app.route('/consulta_estudiantes')
-def consulta_estudiantes():
-    estudiantes = Estudiante.query.join(Curso).join(Grado).all()
-    return render_template('consulta_estudiantes.html', estudiantes=estudiantes)
-
-@app.route('/materias_registradas')
-def materias_registradas():
-    grados = Grado.query.options(
-        db.joinedload(Grado.cursos).joinedload(Curso.materias)
-    ).all()
-    return render_template('materias_registradas.html', grados=grados)
-
-@app.route('/notas_registradas', methods=['GET'])
+@app.route('/notas_registradas')
 def notas_registradas():
     grados = Grado.query.options(db.joinedload(Grado.cursos)).all()
-
-    # Convertir grados y cursos a diccionarios
-    grados_data = [grado.to_dict() for grado in grados]
-
+    grados_data = [g.to_dict() for g in grados]
     grado_id = request.args.get('grado')
     curso_id = request.args.get('curso')
     buscar = request.args.get('buscar', '').strip().lower()
 
     query = Nota.query.join(Estudiante).join(Curso).join(Grado)
-
     if grado_id:
         query = query.filter(Curso.grado_id == grado_id)
     if curso_id:
@@ -315,19 +240,30 @@ def notas_registradas():
             (Estudiante.nombre.ilike(f'%{buscar}%')) |
             (Estudiante.apellido.ilike(f'%{buscar}%'))
         )
+    notas = [n.to_dict() for n in query.all()]
+    return render_template('notas_registradas.html', notas=notas, grados=grados_data, grado_id=grado_id, curso_id=curso_id, buscar=buscar)
 
-    notas = query.all()
+@app.route('/materias_registradas')
+def materias_registradas():
+    grados = Grado.query.options(db.joinedload(Grado.cursos).joinedload(Curso.materias)).all()
+    return render_template('materias_registradas.html', grados=grados)
 
-    # Puedes convertir las notas a diccionario aquí si es necesario
-    notas_data = [nota.to_dict() for nota in notas]
+@app.route('/cursos_por_grado/<int:grado_id>')
+def cursos_por_grado(grado_id):
+    cursos = Curso.query.filter_by(grado_id=grado_id).all()
+    return jsonify([{'id': c.id, 'nombre': c.nombre} for c in cursos])
 
-    return render_template('notas_registradas.html', notas=notas_data, grados=grados_data, grado_id=grado_id, curso_id=curso_id, buscar=buscar)
+@app.route('/estudiantes_por_curso/<int:curso_id>')
+def estudiantes_por_curso(curso_id):
+    estudiantes = Estudiante.query.filter_by(curso_id=curso_id).all()
+    return jsonify([{'id': e.id, 'nombre': e.nombre, 'apellido': e.apellido} for e in estudiantes])
 
+@app.route('/consulta_estudiantes')
+def consulta_estudiantes():
+    estudiantes = Estudiante.query.join(Curso).join(Grado).all()
+    return render_template('consulta_estudiantes.html', estudiantes=estudiantes)
 
-
-
-
-# Inicializar tablas
+# Crear las tablas en la base de datos
 with app.app_context():
     db.create_all()
 
