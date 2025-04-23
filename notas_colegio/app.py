@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/notas_colegio_2'
@@ -100,6 +102,7 @@ class Nota(db.Model):
 
 
 class Usuario(db.Model):
+    __tablename__ = 'usuario'
     id = db.Column(db.Integer, primary_key=True)
     correo = db.Column(db.String(120), unique=True, nullable=False)
     contrasena = db.Column(db.String(120), nullable=False)
@@ -109,33 +112,68 @@ class Usuario(db.Model):
 def index():
     return render_template('index.html')
 
+from flask import session
+
+from werkzeug.security import check_password_hash  # Asegúrate de importar esto
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        correo = request.form['correo']
-        contrasena = request.form['contrasena']
-        usuario = Usuario.query.filter_by(correo=correo).first()
-        if usuario and usuario.contrasena == contrasena:
-            flash('Inicio de sesión exitoso', 'success')
-            return redirect(url_for('index'))
-        flash('Correo o contraseña incorrectos', 'danger')
+        correo = request.form.get('correo')
+        contrasena = request.form.get('contrasena')
+
+        if correo and contrasena:
+            usuario = Usuario.query.filter_by(correo=correo).first()
+            if usuario and check_password_hash(usuario.contrasena, contrasena):  # Verificación con hash
+                # Si la contraseña es correcta, guarda el id del usuario en la sesión
+                session['usuario_id'] = usuario.id
+                flash('Inicio de sesión exitoso', 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('Correo o contraseña incorrectos', 'danger')
+        else:
+            flash('Por favor, completa todos los campos', 'warning')
+
     return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('usuario_id', None)  # Elimina la sesión del usuario
+    flash('Sesión cerrada correctamente', 'info')
+    return redirect(url_for('login'))
+
+
 
 @app.route('/registro_usuario', methods=['GET', 'POST'])
 def registro_usuario():
     if request.method == 'POST':
-        correo = request.form['correo']
-        contrasena = request.form['contrasena']
-        if not correo or not contrasena:
+        correo = request.form.get('correo')
+        contrasena = request.form.get('contrasena')
+        confirmar_contrasena = request.form.get('confirmar_contrasena')
+
+        # Verifica que todos los campos estén completos
+        if not correo or not contrasena or not confirmar_contrasena:
             flash('Todos los campos son obligatorios.', 'danger')
+        
+        # Verifica si el usuario ya existe
         elif Usuario.query.filter_by(correo=correo).first():
             flash('El usuario ya existe.', 'danger')
+        
+        # Verifica si las contraseñas coinciden
+        elif contrasena != confirmar_contrasena:
+            flash('Las contraseñas no coinciden.', 'danger')
+        
         else:
-            db.session.add(Usuario(correo=correo, contrasena=contrasena))
+            # Cifra la contraseña antes de guardarla
+            contrasena_hash = generate_password_hash(contrasena)
+            # Agrega el nuevo usuario a la base de datos
+            db.session.add(Usuario(correo=correo, contrasena=contrasena_hash))
             db.session.commit()
             flash('Usuario registrado correctamente.', 'success')
             return redirect(url_for('login'))
+
     return render_template('registro_usuario.html')
+
 
 @app.route('/registro_grado', methods=['GET', 'POST'])
 def registro_grado():
