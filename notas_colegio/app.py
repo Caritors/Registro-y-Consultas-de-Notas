@@ -4,6 +4,8 @@ from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 
+
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/notas_colegio_2'
 app.config['SECRET_KEY'] = 'tu_clave_secreta'
@@ -32,7 +34,7 @@ class Curso(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     grado_id = db.Column(db.Integer, db.ForeignKey('grado.id'), nullable=False)
     estudiantes = db.relationship('Estudiante', backref='curso', lazy=True, cascade="all, delete-orphan")
-    notas = db.relationship('Nota', backref='curso', lazy=True)
+    notas = db.relationship('Nota', back_populates='curso')
     materias = db.relationship('Materia', backref='curso', lazy=True)
 
     def to_dict(self):
@@ -52,7 +54,9 @@ class Estudiante(db.Model):
     correo = db.Column(db.String(100), nullable=False, unique=True)
     documento = db.Column(db.String(100), nullable=False, unique=True)
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'), nullable=False)
-    notas = db.relationship('Nota', backref='estudiante', lazy=True)
+    notas = db.relationship('Nota', back_populates='estudiante')
+
+ 
 
     def to_dict(self):
         return {
@@ -80,6 +84,10 @@ class Nota(db.Model):
     estudiante_id = db.Column(db.Integer, db.ForeignKey('estudiante.id'), nullable=False)
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'), nullable=False)
 
+    curso = db.relationship('Curso', back_populates='notas')
+    estudiante = db.relationship('Estudiante', back_populates='notas')
+
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -88,17 +96,18 @@ class Nota(db.Model):
             'estudiante_id': self.estudiante_id,
             'curso_id': self.curso_id,
             'estudiante': {
-            'nombre': self.estudiante.nombre,
-            'apellido': self.estudiante.apellido
-        } if self.estudiante else None,
-        'curso': {
-            'nombre': self.curso.nombre,
-            'grado': {
-                'id': self.curso.grado.id,
-                'nombre': self.curso.grado.nombre
-            } if self.curso and self.curso.grado else None
-        } if self.curso else None
-    }
+                'nombre': self.estudiante.nombre,
+                'apellido': self.estudiante.apellido
+            } if self.estudiante else None,
+            'curso': {
+                'nombre': self.curso.nombre,
+                'grado': {
+                    'id': self.curso.grado.id,
+                    'nombre': self.curso.grado.nombre
+                } if self.curso and self.curso.grado else None
+            } if self.curso else None
+        }
+
 
 
 class Usuario(db.Model):
@@ -124,7 +133,7 @@ def login():
 
         if correo and contrasena:
             usuario = Usuario.query.filter_by(correo=correo).first()
-            if usuario and check_password_hash(usuario.contrasena, contrasena):  # Verificación con hash
+            if usuario and usuario.contrasena == contrasena:  # Comparar las contraseñas en texto plano
                 # Si la contraseña es correcta, guarda el id del usuario en la sesión
                 session['usuario_id'] = usuario.id
                 flash('Inicio de sesión exitoso', 'success')
@@ -136,6 +145,9 @@ def login():
 
     return render_template('login.html')
 
+
+
+
 @app.route('/logout')
 def logout():
     session.pop('usuario_id', None)  # Elimina la sesión del usuario
@@ -144,35 +156,34 @@ def logout():
 
 
 
+
+
 @app.route('/registro_usuario', methods=['GET', 'POST'])
 def registro_usuario():
     if request.method == 'POST':
         correo = request.form.get('correo')
         contrasena = request.form.get('contrasena')
-        confirmar_contrasena = request.form.get('confirmar_contrasena')
 
-        # Verifica que todos los campos estén completos
-        if not correo or not contrasena or not confirmar_contrasena:
-            flash('Todos los campos son obligatorios.', 'danger')
-        
-        # Verifica si el usuario ya existe
-        elif Usuario.query.filter_by(correo=correo).first():
-            flash('El usuario ya existe.', 'danger')
-        
-        # Verifica si las contraseñas coinciden
-        elif contrasena != confirmar_contrasena:
-            flash('Las contraseñas no coinciden.', 'danger')
-        
-        else:
-            # Cifra la contraseña antes de guardarla
-            contrasena_hash = generate_password_hash(contrasena)
-            # Agrega el nuevo usuario a la base de datos
-            db.session.add(Usuario(correo=correo, contrasena=contrasena_hash))
+        if correo and contrasena:
+            # Verifica si ya existe ese correo
+            existente = Usuario.query.filter_by(correo=correo).first()
+            if existente:
+                flash('Este correo ya está registrado', 'warning')
+                return redirect(url_for('registro_usuario'))
+
+            # Almacena la contraseña en texto plano directamente
+            nuevo_usuario = Usuario(correo=correo, contrasena=contrasena)  # No se usa hash
+
+            db.session.add(nuevo_usuario)
             db.session.commit()
-            flash('Usuario registrado correctamente.', 'success')
+
+            flash('Usuario registrado exitosamente', 'success')
             return redirect(url_for('login'))
+        else:
+            flash('Por favor, completa todos los campos', 'warning')
 
     return render_template('registro_usuario.html')
+
 
 
 @app.route('/registro_grado', methods=['GET', 'POST'])
